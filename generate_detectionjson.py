@@ -28,7 +28,8 @@ def write_json(img_name, humans, json_out):
     
     image_h, image_w = cv2.imread(img_name).shape[:2]
 
-    image_id = int(os.path.basename(img_name).replace('.jpg', '').lstrip('0'))
+    image_id = os.path.basename(img_name).replace('.jpg', '').replace('COCO_val2014_', '').replace('COCO_train2014_', '')
+    image_id = int(image_id.lstrip('0'))
     
     for h in humans:
         
@@ -141,9 +142,16 @@ def main():
             
             for annid in imgs_info.keys():
             
-                filename = str(annid).zfill(12)+'.jpg'
-                image_files.append('{}/{}/{}'.format(dataDir, dataType, filename))
-                
+                if dataType.endswith('2017'):
+                    filename = str(annid).zfill(12)+'.jpg'
+                    image_files.append('{}/{}/{}'.format(dataDir, dataType, filename))
+                elif dataType.endswith('2014'):
+                    if dataType.startswith('val'):
+                        filename = 'COCO_val2014_'+str(annid).zfill(12)+'.jpg'
+                    elif dataType.startswith('train'):
+                        filename = 'COCO_train2014_'+str(annid).zfill(12)+'.jpg'
+                        
+                    image_files.append('{}/{}/{}'.format(dataDir, dataType, filename))
             inference(args.base_model, args.path_to_npz, args.data_format, image_files, args.plot, args.writejson)
 
         elif args.images.endswith('.txt'):
