@@ -1,0 +1,1 @@
+python3 generate_detectionjson.py --path-to-npz ../../models/coco2017/pose100000.npz --image ../../data/mscoco2017/annotations/person_keypoints_val2017.json --base-model vgg19 --plot True --writejson True --outputdir vis_val2017_100000_vgginitlrvariationaddloss_None_None --gpu 0
