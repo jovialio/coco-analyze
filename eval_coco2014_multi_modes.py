@@ -22,7 +22,7 @@ import os.path
 import pandas
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 sys.path.append('../../')
 from openpose_plus.models import get_model
@@ -65,9 +65,10 @@ def load_cmu_val1k(mode):
     return flist
 
 
-def process_multi_scale (input_image, model, params, model_params):
+def process_multi_scale(input_image, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params):
 
-    oriImg = cv2.imread(input_image)  # B,G,R order
+    image, oriImg = measure(lambda: read_imgfile(input_image, None, None, data_format='channels_last'), 'read_imgfile')
+
     multiplier = [x * model_params['boxsize'] / oriImg.shape[0] for x in params['scale_search']]
 
     heatmap_avg = np.zeros((oriImg.shape[0], oriImg.shape[1], 19))
@@ -80,19 +81,26 @@ def process_multi_scale (input_image, model, params, model_params):
         imageToTest_padded, pad = util.padRightDownCorner(imageToTest, model_params['stride'],
                                                           model_params['padValue'])
 
-        input_img = np.transpose(np.float32(imageToTest_padded[:,:,:,np.newaxis]), (3,0,1,2)) # required shape (1, width, height, channels)
+        imageToTest_padded = imageToTest_padded / 255.0
+        #input_img = np.transpose(np.float32(imageToTest_padded[:,:,:,np.newaxis]), (3,0,1,2)) # required shape (1, width, height, channels)
 
-        output_blobs = model.predict(input_img)
+        #output_blobs = model.predict(input_img)
+
+        heatmap, pafmap = persistent_sess.run(
+            [tensor_heatmap, tensor_paf], feed_dict={
+                tensor_image: [imageToTest_padded]
+            })
+
 
         # extract outputs, resize, and remove padding
-        heatmap = np.squeeze(output_blobs[1])  # output 1 is heatmaps
+        heatmap = np.squeeze(heatmap)  # output 1 is heatmaps
         heatmap = cv2.resize(heatmap, (0, 0), fx=model_params['stride'], fy=model_params['stride'],
                              interpolation=cv2.INTER_CUBIC)
         heatmap = heatmap[:imageToTest_padded.shape[0] - pad[2], :imageToTest_padded.shape[1] - pad[3],
                   :]
         heatmap = cv2.resize(heatmap, (oriImg.shape[1], oriImg.shape[0]), interpolation=cv2.INTER_CUBIC)
 
-        paf = np.squeeze(output_blobs[0])  # output 0 is PAFs
+        paf = np.squeeze(pafmap)  # output 0 is PAFs
         paf = cv2.resize(paf, (0, 0), fx=model_params['stride'], fy=model_params['stride'],
                          interpolation=cv2.INTER_CUBIC)
         paf = paf[:imageToTest_padded.shape[0] - pad[2], :imageToTest_padded.shape[1] - pad[3], :]
@@ -465,7 +473,7 @@ def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, 
     persistent_sess.run(tf.global_variables_initializer())
     model_func = get_model("vgg19", is_resize=False)
     tensor_image, tensor_heatmap, tensor_paf = model_func((None,None), 'channels_last')
-    tl.files.load_and_assign_npz_dict("/home/std/work/Dennis/openpose-plus/models/coco2017_trained2014_vgginit_lrvariation_addloss_aug_nesterov_resizeshortest_Exp10/pose444000.npz", persistent_sess)
+    tl.files.load_and_assign_npz_dict("/home/std/work/Dennis/openpose-plus/models/coco2017_trained2014_vgginit_lrvariation_addloss_aug_nesterov_resizeshortest_Exp10/pose464000.npz", persistent_sess)
     # load model config
     params, model_params = config_reader()
 
@@ -487,7 +495,7 @@ def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, 
     if not os.path.exists('./results'):
         os.mkdir('./results')
 
-    output_folder = './results/val2014-ours-epoch%d-%s'%(trained_epoch,mode_name)
+    output_folder = './results/val2014-ours-epoch%d-%s_Exp10_464000'%(trained_epoch,mode_name)
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
 
@@ -514,7 +522,7 @@ def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, 
 
         # run keypoint detection
         if eval_method==1:
-            visual_result, candidate, subset= process_multi_scale(input_fname, model, params, model_params)
+            visual_result, candidate, subset= process_multi_scale(input_fname, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params)
         elif eval_method==0:
             visual_result, candidate, subset = process_single_scale(input_fname, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params)
 
