@@ -473,7 +473,7 @@ def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, 
     persistent_sess.run(tf.global_variables_initializer())
     model_func = get_model("vgg19", is_resize=False)
     tensor_image, tensor_heatmap, tensor_paf = model_func((None,None), 'channels_last')
-    tl.files.load_and_assign_npz_dict("/home/std/work/Dennis/openpose-plus/models/coco2017_trained2014_vgginit_lrvariation_addloss_aug_nesterov_resizeshortest_Exp10/pose464000.npz", persistent_sess)
+    tl.files.load_and_assign_npz_dict(model_weights_file, persistent_sess)
     # load model config
     params, model_params = config_reader()
 
@@ -495,7 +495,7 @@ def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, 
     if not os.path.exists('./results'):
         os.mkdir('./results')
 
-    output_folder = './results/val2014-ours-epoch%d-%s_Exp10_464000'%(trained_epoch,mode_name)
+    output_folder = './results/val2014-ours-epoch%d-%s_Exp10_%s'%(trained_epoch,mode_name,model_weights_file[model_weights_file.rfind("pose")+4:-4])
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
 
