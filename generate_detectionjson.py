@@ -60,7 +60,7 @@ def write_json(img_name, humans, json_out):
                          "score" : h.score})
 
 
-def inference(base_model_name, path_to_npz, data_format, input_files, plot, writejson, outputdir, is_resize = False):
+def inference(base_model_name, path_to_npz, data_format, input_files, plot, writejson, outputdir, preExp13, is_resize = False):
     
     NumberOfIteration = path_to_npz[int(path_to_npz.rfind('pose'))+4:int(path_to_npz.rfind('.npz'))]
 
@@ -114,7 +114,7 @@ def inference(base_model_name, path_to_npz, data_format, input_files, plot, writ
 
     for idx, img_name in enumerate(input_files):
 
-        image, orig_image = measure(lambda: read_imgfile(img_name, width, height, data_format=data_format), 'read_imgfile')
+        image, orig_image = measure(lambda: read_imgfile(img_name, width, height, preExp13=preExp13, data_format=data_format), 'read_imgfile')
         
         if orig_image is None:
             sys.exit(-1)
@@ -157,6 +157,7 @@ def parse_args():
     parser.add_argument('--writejson', type=bool, default=False, help='write results to json')
     parser.add_argument('--outputdir', type=str, default='vis', help='write results to out dir')
     parser.add_argument('--gpu', type=str, default='0', help='write results to out dir')
+    parser.add_argument('--preExp13', type=str, default='None', help='Type True or False')
     parser.add_argument('--iter', type=int, default=0, help='iteration to start inference')
 
     return parser.parse_args()
@@ -178,7 +179,7 @@ def main():
     
     if args.images.endswith(('.jpg', '.JPG', '.png', '.PNG')):
         image_files = ([f for f in args.images.split(',') if f] * args.repeat)[:args.limit]
-        inference(args.base_model, args.path_to_npz, args.data_format, image_files, args.plot, args.writejson, args.outputdir.strip('/'))
+        inference(args.base_model, args.path_to_npz, args.data_format, image_files, args.plot, args.writejson, args.outputdir.strip('/'), args.preExp13)
         
     elif os.path.isdir(args.images):
         image_files = []
@@ -191,7 +192,7 @@ def main():
         for image in glob.glob(os.path.join(args.images, '*.JPG')):
             image_files.append(image)
             
-        inference(args.base_model, args.path_to_npz, args.data_format, image_files, args.plot, args.writejson, args.outputdir.strip('/'))
+        inference(args.base_model, args.path_to_npz, args.data_format, image_files, args.plot, args.writejson, args.outputdir.strip('/'), args.preExp13)
         
     elif os.path.isfile(args.images):
         image_files = []
@@ -234,7 +235,7 @@ def main():
                     iteration = int(npz_file[int(npz_file.rfind('pose'))+4:int(npz_file.rfind('.npz'))])
                     if iteration >= args.iter and iteration%2000 == 0:                        
 
-                        resFile = inference(args.base_model, npz_file, args.data_format, image_files, args.plot, args.writejson, args.outputdir.strip('/'))
+                        resFile = inference(args.base_model, npz_file, args.data_format, image_files, args.plot, args.writejson, args.outputdir.strip('/'),args.preExp13)
 
                         ## load ground truth annotations
                         coco_gt = COCO(annFile)
@@ -249,14 +250,14 @@ def main():
                         coco_analyze.evaluate(verbose=True, makeplots=True, savedir=resFile[:int(resFile.rfind('json_detection'))], team_name=str(iteration))
                         
             else:
-                inference(args.base_model, args.path_to_npz, args.data_format, image_files, args.plot, args.writejson, args.outputdir.strip('/'))
+                inference(args.base_model, args.path_to_npz, args.data_format, image_files, args.plot, args.writejson, args.outputdir.strip('/'), args.preExp13)
 
         elif args.images.endswith('.txt'):
 
             with open(images, 'r') as textfile:
                 for line in textfile:
                     image_files.append(line.strip())
-            inference(args.base_model, args.path_to_npz, args.data_format, image_files, args.plot, args.writejson, args.outputdir.strip('/'))
+            inference(args.base_model, args.path_to_npz, args.data_format, image_files, args.plot, args.writejson, args.outputdir.strip('/'), args.preExp13)
         
         else:
             print('Wrong file format input. Only accepts .json or .txt file')
