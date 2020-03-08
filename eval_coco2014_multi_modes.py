@@ -22,7 +22,7 @@ import os.path
 import pandas
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 sys.path.append('../../')
 from openpose_plus.models import get_model
@@ -281,7 +281,7 @@ def process_multi_scale(input_image, tensor_image, tensor_heatmap, tensor_paf, p
 def process_single_scale (input_image, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params):
 
 
-    image, oriImg = measure(lambda: read_imgfile(input_image, None, None, data_format='channels_last'), 'read_imgfile')
+    image, oriImg = measure(lambda: read_imgfile(input_image, None, None, preExp13='True', data_format='channels_last'), 'read_imgfile')
 
     heatmap_ori_size = np.zeros((oriImg.shape[0], oriImg.shape[1], 19))
     paf_ori_size = np.zeros((oriImg.shape[0], oriImg.shape[1], 38))
@@ -471,7 +471,7 @@ def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, 
     config.log_device_placement = False  # to log device placement (on which device the operation ran)
     persistent_sess = tf.InteractiveSession(config=config)
     persistent_sess.run(tf.global_variables_initializer())
-    model_func = get_model("vgg19", is_resize=False)
+    model_func = get_model("vgg19_preExp13", is_resize=False)
     tensor_image, tensor_heatmap, tensor_paf = model_func((None,None), 'channels_last')
     tl.files.load_and_assign_npz_dict(model_weights_file, persistent_sess)
     # load model config
@@ -495,7 +495,7 @@ def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, 
     if not os.path.exists('./results'):
         os.mkdir('./results')
 
-    output_folder = './results/val2014-ours-epoch%d-%s_Exp10_%s'%(trained_epoch,mode_name,model_weights_file[model_weights_file.rfind("pose")+4:-4])
+    output_folder = './results/val2014-ours-epoch%d-%s_Exp12_%s'%(trained_epoch,mode_name,model_weights_file[model_weights_file.rfind("pose")+4:-4])
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
 
@@ -604,7 +604,8 @@ def run_eval_metric(cocoGt, prediction_json, total_time, full_eval):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     epoch_num = 100
-    model_file = '../training/weights/weights.%04d.h5'%(epoch_num)
+    #model_file = '../training/weights/weights.%04d.h5'%(epoch_num)
+    model_file = '/home/std/work/Dennis/openpose-plus/models/coco2017_trained2014_vgginit_lrvariation_addloss_aug_nesterov_resizeshortest_Exp12/pose444000.npz'
     parser.add_argument('--model', type=str, default=model_file, help='path to the weights file')
     parser.add_argument('--outputjson', type=str, default='val2014_result.json', help='path to the json file for coco eval')
     parser.add_argument('--coco_dataType', type=str, default='val2014', help='val2017 or val2014')
@@ -626,6 +627,8 @@ if __name__ == '__main__':
     tic = time.time()
     print('start processing...')
     json_path = compute_keypoints(keras_weights_file, cocoGt, args.coco_api_dir, args.coco_dataType, args.eval_method, epoch_num)
+    #json_path = '/home/std/work/Dennis/openpose-plus/examples/coco-analyze/results/val2014-ours-epoch100-open-pose-single-scale_Exp12_444000/val2014_result.json'
+
     toc = time.time()
     total_time = toc - tic
     print ('overall processing time is %.5f' % (toc - tic))
