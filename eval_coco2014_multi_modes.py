@@ -65,9 +65,9 @@ def load_cmu_val1k(mode):
     return flist
 
 
-def process_multi_scale(input_image, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params):
+def process_multi_scale(input_image, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params, preExp13):
 
-    image, oriImg = measure(lambda: read_imgfile(input_image, None, None, data_format='channels_last'), 'read_imgfile')
+    image, oriImg = measure(lambda: read_imgfile(input_image, None, None, preExp13=preExp13, data_format='channels_last'), 'read_imgfile')
 
     multiplier = [x * model_params['boxsize'] / oriImg.shape[0] for x in params['scale_search']]
 
@@ -134,8 +134,6 @@ def process_multi_scale(input_image, tensor_image, tensor_heatmap, tensor_paf, p
 
         all_peaks.append(peaks_with_score_and_id)
         peak_counter += len(peaks)
-
-
 
     connection_all = []
     special_k = []
@@ -278,10 +276,10 @@ def process_multi_scale(input_image, tensor_image, tensor_heatmap, tensor_paf, p
 
     return canvas, candidate, subset
 
-def process_single_scale (input_image, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params):
+def process_single_scale (input_image, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params, preExp13):
 
 
-    image, oriImg = measure(lambda: read_imgfile(input_image, None, None, preExp13='True', data_format='channels_last'), 'read_imgfile')
+    image, oriImg = measure(lambda: read_imgfile(input_image, None, None, preExp13=preExp13, data_format='channels_last'), 'read_imgfile')
 
     heatmap_ori_size = np.zeros((oriImg.shape[0], oriImg.shape[1], 19))
     paf_ori_size = np.zeros((oriImg.shape[0], oriImg.shape[1], 38))
@@ -464,16 +462,28 @@ def process_single_scale (input_image, tensor_image, tensor_heatmap, tensor_paf,
     return canvas, candidate, subset
 
 
-def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, eval_method, epoch_num):
+def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, eval_method, epoch_num, preExp13):
     # load model
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
     config.log_device_placement = False  # to log device placement (on which device the operation ran)
     persistent_sess = tf.InteractiveSession(config=config)
     persistent_sess.run(tf.global_variables_initializer())
-    model_func = get_model("vgg19_preExp13", is_resize=False)
+
+    if preExp13 == "True":
+    	model_func = get_model("vgg19_preExp13", is_resize=False)
+    elif preExp13 == "False":
+    	model_func = get_model("vgg19", is_resize=False)
+    else:
+    	raise Exception("Wrong Model Name")
+
     tensor_image, tensor_heatmap, tensor_paf = model_func((None,None), 'channels_last')
     tl.files.load_and_assign_npz_dict(model_weights_file, persistent_sess)
+
+    # Experiment number
+    modelFolderBasename = os.path.basename(os.path.dirname(model_weights_file))
+    expNumber = modelFolderBasename[modelFolderBasename.rfind('Exp'):]
+
     # load model config
     params, model_params = config_reader()
 
@@ -495,7 +505,7 @@ def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, 
     if not os.path.exists('./results'):
         os.mkdir('./results')
 
-    output_folder = './results/val2014-ours-epoch%d-%s_Exp12_%s'%(trained_epoch,mode_name,model_weights_file[model_weights_file.rfind("pose")+4:-4])
+    output_folder = './results/val2014-ours-%s_%s_iter_%s'%(mode_name, expNumber, model_weights_file[model_weights_file.rfind("pose")+4:-4])
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
 
@@ -522,9 +532,9 @@ def compute_keypoints(model_weights_file, cocoGt, coco_api_dir, coco_data_type, 
 
         # run keypoint detection
         if eval_method==1:
-            visual_result, candidate, subset= process_multi_scale(input_fname, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params)
+            visual_result, candidate, subset= process_multi_scale(input_fname, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params, preExp13)
         elif eval_method==0:
-            visual_result, candidate, subset = process_single_scale(input_fname, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params)
+            visual_result, candidate, subset = process_single_scale(input_fname, tensor_image, tensor_heatmap, tensor_paf, persistent_sess, params, model_params, preExp13)
 
         # draw results       
         output_fname = '%s/result_%s'%(prediction_folder,fname)
@@ -605,12 +615,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     epoch_num = 100
     #model_file = '../training/weights/weights.%04d.h5'%(epoch_num)
-    model_file = '/home/std/work/Dennis/openpose-plus/models/coco2017_trained2014_vgginit_lrvariation_addloss_aug_nesterov_resizeshortest_Exp12/pose444000.npz'
+    model_file = '/home/std/work/Dennis/openpose-plus/models/coco2017_trained2014_vgginit_lrvariation_addloss_aug_nesterov_resizeshortest_Exp13/pose286000.npz'
     parser.add_argument('--model', type=str, default=model_file, help='path to the weights file')
     parser.add_argument('--outputjson', type=str, default='val2014_result.json', help='path to the json file for coco eval')
     parser.add_argument('--coco_dataType', type=str, default='val2014', help='val2017 or val2014')
     parser.add_argument('--coco_api_dir', type=str, default='../dataset/cocoapi', help='path to coco api')
-    parser.add_argument('--eval_method', type=int, default=0, help='open-pose-single-scale: 0, open-pose-multi-scale: 1')
+    parser.add_argument('--eval_method', type=int, default=1, help='open-pose-single-scale: 0, open-pose-multi-scale: 1')
+    parser.add_argument('--preExp13', type=str, default='None', help='Type True or False')
 
     args = parser.parse_args()
     keras_weights_file = args.model
@@ -626,7 +637,7 @@ if __name__ == '__main__':
 
     tic = time.time()
     print('start processing...')
-    json_path = compute_keypoints(keras_weights_file, cocoGt, args.coco_api_dir, args.coco_dataType, args.eval_method, epoch_num)
+    json_path = compute_keypoints(keras_weights_file, cocoGt, args.coco_api_dir, args.coco_dataType, args.eval_method, epoch_num, args.preExp13)
     #json_path = '/home/std/work/Dennis/openpose-plus/examples/coco-analyze/results/val2014-ours-epoch100-open-pose-single-scale_Exp12_444000/val2014_result.json'
 
     toc = time.time()
